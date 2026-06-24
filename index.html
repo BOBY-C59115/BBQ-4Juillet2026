@@ -1041,7 +1041,7 @@
     const wrap = document.getElementById('invites-list');
     wrap.innerHTML = '';
     invites.forEach((inv, i)=>{
-      const isDup = checkDoublon(inv.prenom, inv.nom, null);
+      const isDup = checkDoublon(inv.prenom, inv.nom, null) && inv.prenom && inv.nom;
       const box = document.createElement('div');
       box.className = 'accomp-box';
       box.innerHTML = `
@@ -1050,15 +1050,25 @@
         <input type="text" class="inv-prenom" data-i="${i}" placeholder="Prénom" value="${escapeHtml(inv.prenom)}">
         <label>Nom</label>
         <input type="text" class="inv-nom" data-i="${i}" placeholder="Nom" value="${escapeHtml(inv.nom)}">
-        ${isDup && inv.prenom && inv.nom ? `<div class="warnmsg show">⚠️ <span>Quelqu'un de ce nom est déjà inscrit. Vérifie qu'il ne s'agit pas d'un doublon.</span></div>` : ''}
+        <div class="warnmsg inv-warn-${i}" style="${isDup ? 'display:flex;' : ''}">⚠️ <span>Quelqu'un de ce nom est déjà inscrit. Vérifie qu'il ne s'agit pas d'un doublon.</span></div>
       `;
       wrap.appendChild(box);
     });
+    // La frappe met à jour uniquement la donnée + le warning ciblé, sans reconstruire le DOM
+    // (reconstruire à chaque caractère ferait perdre le focus du clavier)
     wrap.querySelectorAll('.inv-prenom').forEach(el=>{
-      el.addEventListener('input', e=>{ invites[+e.target.dataset.i].prenom = e.target.value; renderInvites(); });
+      el.addEventListener('input', e=>{
+        const i = +e.target.dataset.i;
+        invites[i].prenom = e.target.value;
+        updateInviteWarning(i);
+      });
     });
     wrap.querySelectorAll('.inv-nom').forEach(el=>{
-      el.addEventListener('input', e=>{ invites[+e.target.dataset.i].nom = e.target.value; renderInvites(); });
+      el.addEventListener('input', e=>{
+        const i = +e.target.dataset.i;
+        invites[i].nom = e.target.value;
+        updateInviteWarning(i);
+      });
     });
     wrap.querySelectorAll('.remove-x').forEach(el=>{
       el.addEventListener('click', e=>{
@@ -1068,6 +1078,13 @@
     });
     document.getElementById('cap-note-invites').style.display = invites.length >= MAX_LINES ? 'block' : 'none';
     document.getElementById('btn-add-invite').style.display = invites.length >= 10 ? 'none' : 'flex';
+  }
+
+  function updateInviteWarning(i){
+    const inv = invites[i];
+    const isDup = checkDoublon(inv.prenom, inv.nom, null) && inv.prenom && inv.nom;
+    const warnEl = document.querySelector('.inv-warn-'+i);
+    if(warnEl) warnEl.style.display = isDup ? 'flex' : 'none';
   }
 
   document.getElementById('btn-add-invite').addEventListener('click', ()=>{
