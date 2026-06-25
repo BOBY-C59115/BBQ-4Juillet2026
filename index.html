@@ -224,6 +224,41 @@
   .btn-fluo{background:var(--fluo); color:var(--marine);}
   .btn-sauge{background:var(--sauge); color:white;}
   .btn-or{background:var(--or-logo); color:#3A2400;}
+  .btnrow-export{display:flex; gap:10px;}
+  .btnrow-export .btn{flex:1; font-size:13.5px; padding:12px 8px;}
+
+  /* ---------- RAPPORT IMPRIMABLE (export PDF via impression navigateur) ---------- */
+  #print-rapport{display:none;}
+  @media print{
+    body *{visibility:hidden;}
+    #print-rapport, #print-rapport *{visibility:visible;}
+    #print-rapport{
+      display:block; position:absolute; top:0; left:0; width:100%; padding:24px;
+      -webkit-print-color-adjust:exact; print-color-adjust:exact;
+      color:var(--encre); font-family:'Quicksand',sans-serif;
+    }
+    .pr-header{text-align:center; margin-bottom:22px; border-bottom:3px solid var(--fluo-dim); padding-bottom:16px;}
+    .pr-title{font-size:26px; font-weight:800; color:var(--marine);}
+    .pr-sub{font-size:12px; color:var(--encre2); margin-top:4px;}
+    .pr-section{margin-bottom:24px; page-break-inside:avoid;}
+    .pr-section h2{font-size:17px; color:var(--marine); border-bottom:2px solid var(--creme2); padding-bottom:6px; margin-bottom:12px;}
+    .pr-stats{display:flex; gap:14px; margin-bottom:12px;}
+    .pr-stat{flex:1; text-align:center; background:var(--creme2); border-radius:10px; padding:10px;}
+    .pr-n{font-size:22px; font-weight:800; color:var(--marine);}
+    .pr-l{font-size:10.5px; color:var(--encre2);}
+    .pr-bar{height:14px; background:var(--rouge-light); border-radius:8px; overflow:hidden;}
+    .pr-bar-fill{height:100%; background:var(--sauge);}
+    .pr-cols{display:flex; gap:20px;}
+    .pr-cols > div{flex:1;}
+    .pr-cols h3{font-size:13px; margin-bottom:6px; color:var(--marine);}
+    .pr-cols ul{padding-left:18px; font-size:12.5px; line-height:1.6; margin:0;}
+    .pr-empty{color:var(--encre2); font-style:italic; list-style:none; margin-left:-18px;}
+    .pr-table{width:100%; border-collapse:collapse; font-size:12px;}
+    .pr-table th{text-align:left; background:var(--marine); color:white; padding:6px 8px;}
+    .pr-table td{padding:5px 8px; border-bottom:1px solid var(--creme2);}
+    .pr-doodle-row{font-size:13px; padding:6px 0; border-bottom:1px solid var(--creme2);}
+    .pr-footer{text-align:center; font-size:11px; color:var(--encre2); margin-top:26px;}
+  }
   .btn-ghost{background:var(--creme2); color:var(--encre);}
   .btn-outline{background:white; color:var(--encre); border:2px solid var(--creme2);}
   .btn-rouge{background:var(--rouge-light); color:var(--rouge);}
@@ -472,6 +507,7 @@
     .welcome-hero{margin:0 -16px 22px;}
   }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -752,12 +788,23 @@
 </div>
 
 <!-- ========== TOAST ========== -->
+<div id="print-rapport"></div>
+
 <div class="toast" id="toast" style="display:none;"></div>
 
 <!-- ========== MODAL ADMIN PANEL ========== -->
 <div class="overlay hidden" id="overlay-admin-panel">
   <div class="sheet">
     <h3>⚙️ Espace organisateur</h3>
+
+    <div style="background:var(--creme2); border-radius:14px; padding:14px; margin-bottom:20px;">
+      <h3 style="font-size:15px; margin-bottom:4px;">📤 Partager le bilan</h3>
+      <p class="desc" style="margin-bottom:12px;">Pratique pour envoyer un point d'étape au groupe, ou garder une liste de course imprimable.</p>
+      <div class="btnrow-export">
+        <button class="btn btn-marine" id="btn-export-pdf">📄 Export PDF</button>
+        <button class="btn btn-or" id="btn-export-excel">📊 Export Excel</button>
+      </div>
+    </div>
 
     <label class="first">📍 Lieu du BBQ</label>
     <input type="text" id="admin-lieu" placeholder="Adresse ou lieu">
@@ -1558,6 +1605,117 @@ function renderBilan(){
   }
 }
 
+/* ---------------- EXPORT : PDF (impression navigateur) + EXCEL (.xlsx) ---------------- */
+function exportRows_Participants(){
+  return partArr().map(p=>({
+    'Prénom': p.prenom,
+    'Nom': p.nom,
+    'Téléphone': p.tel,
+    'Participe': p.participe === 'oui' ? 'Oui' : 'Non',
+    'Invités': (p.invites||[]).map(i=>i.prenom+' '+i.nom).join(', '),
+    'Total personnes': p.participe === 'oui' ? 1+(p.invites?p.invites.length:0) : 0
+  }));
+}
+function exportRows_Victuailles(){
+  const rows = [];
+  const labels = { boisson:'Boisson', sale:'Salé', sucre:'Sucré' };
+  repasArr().forEach(r=>{
+    ['boisson','sale','sucre'].forEach(c=>{
+      (r.items[c]||[]).forEach(it=>{
+        rows.push({ 'Catégorie': labels[c], 'Article': it.nom, 'Quantité': it.qte||1, 'Apporté par': r.nomComplet });
+      });
+    });
+  });
+  return rows;
+}
+function exportRows_Doodle(){
+  return doodleArr().sort((a,b)=>Object.keys(b.votes).length-Object.keys(a.votes).length)
+    .map(o=>({ 'Date proposée': o.date, 'Moment': o.moment==='midi' ? 'Midi' : 'Soir', 'Nombre de votes': Object.keys(o.votes).length }));
+}
+
+document.getElementById('btn-export-excel').addEventListener('click', ()=>{
+  if(!window.XLSX){ showToast("Le module Excel n'a pas pu se charger (vérifie ta connexion)", "⚠️"); return; }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exportRows_Participants()), "Participants");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exportRows_Victuailles()), "Victuailles");
+  const doodleRows = exportRows_Doodle();
+  if(doodleRows.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(doodleRows), "Dates de repli");
+  XLSX.writeFile(wb, "Bilan_BBQ_4_juillet_2026.xlsx");
+  showToast("Fichier Excel téléchargé !", "📊");
+});
+
+function renderPrintRapport(){
+  const all = partArr();
+  const presents = all.filter(p=>p.participe==='oui');
+  const absents = all.filter(p=>p.participe==='non');
+  let total = 0; presents.forEach(p=>{ total += 1+(p.invites?p.invites.length:0); });
+  const totalReponses = presents.length+absents.length;
+  const pctOui = totalReponses ? Math.round(presents.length/totalReponses*100) : 0;
+
+  const allRepas = repasArr();
+  const counts = { boisson:0, sale:0, sucre:0 };
+  allRepas.forEach(r=>['boisson','sale','sucre'].forEach(c=>(r.items[c]||[]).forEach(it=>counts[c]+=(it.qte||1))));
+
+  function catLines(c){
+    const lines = [];
+    allRepas.forEach(r=>(r.items[c]||[]).forEach(it=>lines.push(`${escapeHtml(it.nom)}${it.qte>1?' ×'+it.qte:''} — <i>${escapeHtml(r.nomComplet)}</i>`)));
+    return lines;
+  }
+
+  const sortedDoodle = doodleArr().sort((a,b)=>Object.keys(b.votes).length-Object.keys(a.votes).length).filter(o=>Object.keys(o.votes).length>0);
+  const dateGen = new Date().toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long', year:'numeric' }) +
+    ' à ' + new Date().toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
+
+  document.getElementById('print-rapport').innerHTML = `
+    <div class="pr-header">
+      <div class="pr-title">🔥 Bilan BBQ du 4 juillet 2026</div>
+      <div class="pr-sub">Lys Cyclo — généré le ${dateGen}</div>
+    </div>
+
+    <div class="pr-section">
+      <h2>👥 Qui vient</h2>
+      <div class="pr-stats">
+        <div class="pr-stat"><div class="pr-n">${total}</div><div class="pr-l">personnes attendues</div></div>
+        <div class="pr-stat"><div class="pr-n">${presents.length}</div><div class="pr-l">ont dit oui</div></div>
+        <div class="pr-stat"><div class="pr-n">${absents.length}</div><div class="pr-l">ne viennent pas</div></div>
+      </div>
+      ${totalReponses ? `<div class="pr-bar"><div class="pr-bar-fill" style="width:${pctOui}%;"></div></div>` : ''}
+    </div>
+
+    <div class="pr-section">
+      <h2>🧺 Qui ramène quoi</h2>
+      <div class="pr-cols">
+        <div><h3>🥤 Boissons (${counts.boisson})</h3><ul>${catLines('boisson').map(l=>`<li>${l}</li>`).join('') || '<li class="pr-empty">Rien renseigné</li>'}</ul></div>
+        <div><h3>🧀 Salé (${counts.sale})</h3><ul>${catLines('sale').map(l=>`<li>${l}</li>`).join('') || '<li class="pr-empty">Rien renseigné</li>'}</ul></div>
+        <div><h3>🍰 Sucré (${counts.sucre})</h3><ul>${catLines('sucre').map(l=>`<li>${l}</li>`).join('') || '<li class="pr-empty">Rien renseigné</li>'}</ul></div>
+      </div>
+    </div>
+
+    <div class="pr-section">
+      <h2>📋 Liste détaillée des participants</h2>
+      <table class="pr-table">
+        <thead><tr><th>Nom</th><th>Téléphone</th><th>Vient ?</th><th>Invités</th></tr></thead>
+        <tbody>
+          ${all.map(p=>`<tr><td>${escapeHtml(p.prenom)} ${escapeHtml(p.nom)}</td><td>${escapeHtml(p.tel)}</td><td>${p.participe==='oui'?'🎉 Oui':'😢 Non'}</td><td>${(p.invites||[]).map(i=>escapeHtml(i.prenom+' '+i.nom)).join(', ')||'—'}</td></tr>`).join('') || '<tr><td colspan="4" class="pr-empty">Aucune inscription</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+
+    ${sortedDoodle.length ? `
+    <div class="pr-section">
+      <h2>📅 Dates de repli proposées</h2>
+      ${sortedDoodle.map((o,i)=>`<div class="pr-doodle-row">${i===0?'⭐ ':''}${o.moment==='midi'?'☀️':'🌙'} ${escapeHtml(o.date)} — <b>${Object.keys(o.votes).length} dispo(s)</b></div>`).join('')}
+    </div>` : ''}
+
+    <div class="pr-footer">🚴 Lys Cyclo — L'amitié en roue libre</div>
+  `;
+}
+
+document.getElementById('btn-export-pdf').addEventListener('click', ()=>{
+  renderPrintRapport();
+  setTimeout(()=>window.print(), 50);
+});
+
 /* ---------------- ADMIN (réservé admin / superviseur, sans mot de passe séparé) ---------------- */
 document.getElementById('open-admin').addEventListener('click', ()=>{
   openAdminPanel();
@@ -1711,6 +1869,7 @@ function init(){
 }
 init();
 </script>
+
 
 
 
