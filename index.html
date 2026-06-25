@@ -14,6 +14,7 @@
     --fluo-dim:#D9E600;
     --fluo-soft:#3A3D14;
     --or-logo:#F7B902;
+    --or-dark:#8A5A00;
     --creme:#FAFAF5;
     --creme2:#EEEFE6;
     --encre:#0B1F3A;
@@ -328,6 +329,17 @@
   .stat-card.neutre{background:var(--creme2);}
   .stat-card.neutre .n, .stat-card.neutre .l{color:var(--encre2);}
 
+  /* ---------- BILAN (stats simples, sans graphe complexe) ---------- */
+  .stack-bar{display:flex; height:20px; border-radius:10px; overflow:hidden; margin:6px 0 4px; background:var(--creme2);}
+  .stack-seg{display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:white; transition:width .3s;}
+  .bilan-bar-row{margin-bottom:14px;}
+  .bilan-bar-row:last-child{margin-bottom:0;}
+  .bilan-bar-label{display:flex; justify-content:space-between; align-items:baseline; font-size:13.5px; font-weight:700; color:var(--encre); margin-bottom:5px; gap:8px;}
+  .bilan-bar-label span:last-child{color:var(--encre2); font-weight:800; flex-shrink:0;}
+  .bilan-bar-track{height:14px; background:var(--creme2); border-radius:8px; overflow:hidden;}
+  .bilan-bar-fill{height:100%; border-radius:8px; transition:width .3s; min-width:3px;}
+  .bilan-empty{font-size:13px; color:var(--encre2); text-align:center; padding:10px 0;}
+
   /* ---------- CATEGORY (auberge espagnole) ---------- */
   .cat-block{margin-bottom:22px;}
   .cat-title{
@@ -604,6 +616,7 @@
       <button class="tab-btn" data-tab="liste"><span class="emoji">👥</span> Qui vient</button>
       <button class="tab-btn" data-tab="repas"><span class="emoji">🧺</span> Qui ramène quoi</button>
       <button class="tab-btn" data-tab="doodle"><span class="emoji">📅</span> Pas dispo ?</button>
+      <button class="tab-btn" data-tab="bilan"><span class="emoji">📊</span> Bilan</button>
     </div>
 
     <!-- TAB: mon inscription (lecture + bouton modifier) -->
@@ -708,6 +721,31 @@
           <button class="choice-btn" id="prop-soir" data-val="soir" style="padding:13px;">🌙 Soir</button>
         </div>
         <button class="btn btn-or" id="btn-add-date" style="margin-top:16px;">📌 Proposer cette date</button>
+      </div>
+    </div>
+
+    <!-- TAB: bilan (stats simples) -->
+    <div class="section" id="tab-bilan">
+      <div class="card">
+        <h2><span class="emoji">👥</span> Qui vient au BBQ</h2>
+        <div class="stat-row">
+          <div class="stat-card"><span class="n" id="bilan-total">0</span><span class="l">personnes attendues</span></div>
+          <div class="stat-card"><span class="n" id="bilan-oui">0</span><span class="l">ont dit oui</span></div>
+          <div class="stat-card neg"><span class="n" id="bilan-non">0</span><span class="l">ne viennent pas</span></div>
+        </div>
+        <div class="stack-bar" id="bilan-stack"></div>
+      </div>
+
+      <div class="card">
+        <h2><span class="emoji">🧺</span> Ce qui sera apporté</h2>
+        <p class="desc" id="bilan-contrib">—</p>
+        <div id="bilan-victuailles"></div>
+      </div>
+
+      <div class="card">
+        <h2><span class="emoji">📅</span> Dates de repli proposées</h2>
+        <p class="desc">Si jamais le 4 juillet ne convient pas à tout le monde, classement des dates alternatives par popularité.</p>
+        <div id="bilan-doodle"></div>
       </div>
     </div>
   </div>
@@ -900,6 +938,7 @@ onValue(ref(db,"bbq2026/participants"), (snap)=>{
   renderListe();
   renderRepasTab();
   renderAdminInscrits();
+  renderBilan();
 });
 onValue(ref(db,"bbq2026/repas"), (snap)=>{
   state.repas = snap.val() || {};
@@ -907,6 +946,7 @@ onValue(ref(db,"bbq2026/repas"), (snap)=>{
   renderRepasTab();
   renderRecapTout();
   renderAdminRepas();
+  renderBilan();
 });
 onValue(ref(db,"bbq2026/doodle"), (snap)=>{
   state.doodle = snap.val() || {};
@@ -914,6 +954,7 @@ onValue(ref(db,"bbq2026/doodle"), (snap)=>{
   renderPublicStats();
   renderDoodle();
   renderAdminDoodle();
+  renderBilan();
 });
 
 /* ---------------- RENDER: EVENT INFO + PUBLIC STATS ---------------- */
@@ -995,6 +1036,7 @@ function enterEspace(){
   renderListe();
   renderRepasTab();
   renderDoodle();
+  renderBilan();
   switchTab('moninscription');
 }
 
@@ -1006,6 +1048,7 @@ function switchTab(name){
   if(name==='repas') renderRepasTab();
   if(name==='doodle') renderDoodle();
   if(name==='moninscription') renderMonInscription();
+  if(name==='bilan') renderBilan();
 }
 document.querySelectorAll('.tab-btn').forEach(btn=>{
   btn.addEventListener('click', ()=> switchTab(btn.dataset.tab));
@@ -1436,6 +1479,85 @@ function renderDoodle(){
   });
 }
 
+/* ---------------- BILAN (stats simples, sans graphe complexe) ---------------- */
+function renderBilan(){
+  // --- Qui vient ---
+  const all = partArr();
+  const presents = all.filter(p => p.participe === 'oui');
+  const absents = all.filter(p => p.participe === 'non');
+  let totalPersonnes = 0;
+  presents.forEach(p => { totalPersonnes += 1 + (p.invites ? p.invites.length : 0); });
+  const totalReponses = presents.length + absents.length;
+
+  document.getElementById('bilan-total').textContent = totalPersonnes;
+  document.getElementById('bilan-oui').textContent = presents.length;
+  document.getElementById('bilan-non').textContent = absents.length;
+
+  const stack = document.getElementById('bilan-stack');
+  if(totalReponses === 0){
+    stack.innerHTML = '';
+  } else {
+    const pctOui = Math.round(presents.length / totalReponses * 100);
+    const pctNon = 100 - pctOui;
+    stack.innerHTML = `
+      ${presents.length ? `<div class="stack-seg" style="width:${pctOui}%; background:var(--sauge);">${pctOui}%</div>` : ''}
+      ${absents.length ? `<div class="stack-seg" style="width:${pctNon}%; background:var(--rouge);">${pctNon}%</div>` : ''}
+    `;
+  }
+
+  // --- Ce qui sera apporté ---
+  const allRepas = repasArr();
+  document.getElementById('bilan-contrib').textContent =
+    presents.length
+      ? `${allRepas.length} personne(s) sur ${presents.length} ont déjà indiqué ce qu'elles apportent`
+      : `Personne n'a encore confirmé sa venue`;
+
+  const counts = { boisson: 0, sale: 0, sucre: 0 };
+  allRepas.forEach(r => {
+    ['boisson','sale','sucre'].forEach(c => (r.items[c]||[]).forEach(it => { counts[c] += (it.qte || 1); }));
+  });
+  const maxCount = Math.max(counts.boisson, counts.sale, counts.sucre, 1);
+  const catMeta = [
+    ['boisson', '🥤 Boissons', '#1A4A8C'],
+    ['sale', '🧀 Apéro / Salé', 'var(--sauge-dark)'],
+    ['sucre', '🍰 Sucré', 'var(--or-dark)']
+  ];
+  const wrapV = document.getElementById('bilan-victuailles');
+  if(allRepas.length === 0){
+    wrapV.innerHTML = '<div class="bilan-empty">Rien d\u2019enregistré encore.</div>';
+  } else {
+    wrapV.innerHTML = catMeta.map(([key, label, color]) => {
+      const n = counts[key];
+      const pct = Math.round(n / maxCount * 100);
+      return `
+        <div class="bilan-bar-row">
+          <div class="bilan-bar-label"><span>${label}</span><span>${n}</span></div>
+          <div class="bilan-bar-track"><div class="bilan-bar-fill" style="width:${pct}%; background:${color};"></div></div>
+        </div>`;
+    }).join('');
+  }
+
+  // --- Dates de repli (doodle) ---
+  const sorted = doodleArr().sort((a,b) => Object.keys(b.votes).length - Object.keys(a.votes).length);
+  const wrapD = document.getElementById('bilan-doodle');
+  if(sorted.length === 0){
+    wrapD.innerHTML = '<div class="bilan-empty">Aucune date alternative proposée pour le moment.</div>';
+  } else {
+    const maxVotes = Math.max(...sorted.map(o => Object.keys(o.votes).length), 1);
+    const topHasVotes = Object.keys(sorted[0].votes).length > 0;
+    wrapD.innerHTML = sorted.map((opt, i) => {
+      const n = Object.keys(opt.votes).length;
+      const pct = Math.round(n / maxVotes * 100);
+      const isTop = i === 0 && topHasVotes;
+      return `
+        <div class="bilan-bar-row">
+          <div class="bilan-bar-label"><span>${isTop ? '⭐ ' : ''}${opt.moment==='midi'?'☀️':'🌙'} ${escapeHtml(opt.date)}</span><span>${n} dispo${n>1?'s':''}</span></div>
+          <div class="bilan-bar-track"><div class="bilan-bar-fill" style="width:${pct}%; background:var(--or-logo);"></div></div>
+        </div>`;
+    }).join('');
+  }
+}
+
 /* ---------------- ADMIN (réservé admin / superviseur, sans mot de passe séparé) ---------------- */
 document.getElementById('open-admin').addEventListener('click', ()=>{
   openAdminPanel();
@@ -1589,6 +1711,7 @@ function init(){
 }
 init();
 </script>
+
 
 
 
