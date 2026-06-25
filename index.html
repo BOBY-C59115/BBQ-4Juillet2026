@@ -818,7 +818,7 @@ function findOfficial(prenomU, nomU, telNorm){
 
 // ═══ HELPERS DE LECTURE (Firebase = objets, pas des tableaux) ═══
 function partArr(){ return Object.entries(state.participants||{}).map(([id,d])=>({id, ...d})); }
-function repasArr(){ return Object.entries(state.repas||{}).map(([id,d])=>({participantId:id, ...d})); }
+function repasArr(){ return Object.entries(state.repas||{}).map(([id,d])=>({participantId:id, ...d, items:(d.items||{})})); }
 function doodleArr(){ return Object.entries(state.doodle||{}).map(([id,d])=>({id, ...d, votes:d.votes||{}})); }
 
 /* ---------------- IDENTIFICATION (prénom + nom + mobile, sans mot de passe) ---------------- */
@@ -1589,6 +1589,7 @@ function init(){
 }
 init();
 </script>
+
 
 
 
