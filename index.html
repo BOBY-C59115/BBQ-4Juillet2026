@@ -154,6 +154,28 @@
   .nudge-repas b{font-size:14px; color:var(--encre); display:block; margin-bottom:2px;}
   .nudge-repas p{font-size:12.5px; color:var(--encre2); margin:0;}
   .nudge-repas .btn{flex-shrink:0; padding:10px 12px; font-size:12.5px;}
+
+  /* ---------- TUILES ESPACE PARTICIPANT (navigation grandes icônes) ---------- */
+  .tiles-espace{display:grid; grid-template-columns:repeat(2,1fr); gap:13px; margin-top:16px;}
+  @media(min-width:480px){ .tiles-espace{grid-template-columns:repeat(3,1fr);} }
+  .big-tile{
+    position:relative;
+    background:var(--blanc); border:2.5px solid var(--creme2); border-radius:var(--radius);
+    padding:24px 10px 18px; display:flex; flex-direction:column; align-items:center; gap:8px; text-align:center;
+    box-shadow:var(--ombre); transition:transform .12s, border-color .15s; cursor:pointer;
+  }
+  .big-tile:active{transform:scale(.96);}
+  .big-tile .bt-icon{font-size:40px; line-height:1;}
+  .big-tile .bt-label{font-weight:800; font-size:14.5px; color:var(--marine); line-height:1.25;}
+  .big-tile .bt-sub{font-size:11.5px; color:var(--encre2); font-weight:700;}
+  .big-tile.attention{border-color:var(--or-logo); background:#FFFBEF;}
+  .big-tile.attention .bt-sub{color:#8A5A00;}
+  .big-tile .tile-badge{
+    position:absolute; top:10px; right:10px;
+    display:inline-flex; align-items:center; justify-content:center;
+    background:var(--rouge); color:white; font-size:12px; font-weight:800;
+    width:22px; height:22px; border-radius:50%;
+  }
   .tab-btn.active{
     background: var(--marine);
     border-color: var(--marine);
@@ -655,18 +677,44 @@
   <div id="screen-espace" style="display:none;">
     <button class="back-btn" id="back-from-espace">‹ Retour à l'accueil</button>
 
-    <div class="mini-hero">
-      <span class="me">🔥</span>
-      <span class="mh-text">Samedi 4 juillet 2026, dès 12h30<br><b id="lieuPillE">Lieu en cours de validation</b></span>
+    <div id="espace-grid">
+      <div class="mini-hero">
+        <span class="me">🔥</span>
+        <span class="mh-text">Samedi 4 juillet 2026, dès 12h30<br><b id="lieuPillE">Lieu en cours de validation</b></span>
+      </div>
+
+      <div class="tiles-espace">
+        <button class="big-tile" data-section="moninscription">
+          <span class="bt-icon">✋</span>
+          <span class="bt-label">Mon inscription</span>
+          <span class="bt-sub" id="tile-sub-moninscription">—</span>
+        </button>
+        <button class="big-tile" data-section="liste">
+          <span class="bt-icon">👥</span>
+          <span class="bt-label">Qui vient</span>
+          <span class="bt-sub" id="tile-sub-liste">—</span>
+        </button>
+        <button class="big-tile" data-section="repas">
+          <span class="bt-icon">🧺</span>
+          <span class="bt-label">Qui ramène quoi</span>
+          <span class="bt-sub" id="tile-sub-repas">—</span>
+          <span class="tile-badge" id="repas-badge" style="display:none;">!</span>
+        </button>
+        <button class="big-tile" data-section="doodle">
+          <span class="bt-icon">📅</span>
+          <span class="bt-label">Pas dispo ?</span>
+          <span class="bt-sub" id="tile-sub-doodle">—</span>
+        </button>
+        <button class="big-tile" data-section="bilan">
+          <span class="bt-icon">📊</span>
+          <span class="bt-label">Bilan</span>
+          <span class="bt-sub" id="tile-sub-bilan">—</span>
+        </button>
+      </div>
     </div>
 
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="moninscription"><span class="emoji">✋</span> Mon inscription</button>
-      <button class="tab-btn" data-tab="liste"><span class="emoji">👥</span> Qui vient</button>
-      <button class="tab-btn" data-tab="repas"><span class="emoji">🧺</span> Qui ramène quoi<span class="tab-badge" id="repas-badge" style="display:none;">!</span></button>
-      <button class="tab-btn" data-tab="doodle"><span class="emoji">📅</span> Pas dispo ?</button>
-      <button class="tab-btn" data-tab="bilan"><span class="emoji">📊</span> Bilan</button>
-    </div>
+    <div id="espace-detail" style="display:none;">
+      <button class="back-btn" id="back-to-grid">‹ Retour au menu</button>
 
     <!-- TAB: mon inscription (lecture + bouton modifier) -->
     <div class="section active" id="tab-moninscription">
@@ -796,6 +844,7 @@
         <p class="desc">Si jamais le 4 juillet ne convient pas à tout le monde, classement des dates alternatives par popularité.</p>
         <div id="bilan-doodle"></div>
       </div>
+    </div>
     </div>
   </div>
 </div>
@@ -1087,11 +1136,11 @@ document.getElementById('back-from-espace').addEventListener('click', ()=>{
 });
 
 document.getElementById('go-doodle-direct').addEventListener('click', ()=>{
-  enterEspace();
-  switchTab('doodle');
+  enterEspace(true);
+  showSection('doodle');
 });
 
-function enterEspace(){
+function enterEspace(forceGrid){
   showScreen('screen-espace');
   renderMonInscription();
   renderListe();
@@ -1100,22 +1149,68 @@ function enterEspace(){
   renderBilan();
   const me = state.participants[CU.id];
   const needsRepas = !!(me && me.participe === 'oui' && !state.repas[CU.id]);
-  switchTab(needsRepas ? 'repas' : 'moninscription');
+  if(needsRepas && !forceGrid){
+    showSection('repas');
+  } else {
+    backToGrid();
+  }
 }
 
-/* ---------------- TABS (espace) ---------------- */
-function switchTab(name){
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
+/* ---------------- ESPACE : grille de grandes tuiles + détail ---------------- */
+function renderEspaceGrid(){
+  const me = state.participants[CU.id];
+
+  const subI = document.getElementById('tile-sub-moninscription');
+  if(!me) subI.textContent = '❓ À répondre';
+  else subI.textContent = me.participe === 'oui' ? '✅ Tu viens' : '😢 Tu ne viens pas';
+
+  const all = partArr();
+  const presents = all.filter(p => p.participe === 'oui');
+  let total = 0; presents.forEach(p => { total += 1 + (p.invites ? p.invites.length : 0); });
+  document.getElementById('tile-sub-liste').textContent = total + ' personne' + (total>1?'s':'') + ' attendue' + (total>1?'s':'');
+
+  const hasRepas = !!state.repas[CU.id];
+  const subR = document.getElementById('tile-sub-repas');
+  const tileRepas = document.querySelector('.big-tile[data-section="repas"]');
+  if(me && me.participe === 'oui' && !hasRepas){
+    subR.textContent = '⚠️ À compléter';
+    if(tileRepas) tileRepas.classList.add('attention');
+  } else {
+    const n = repasArr().length;
+    subR.textContent = n ? n + ' contribution' + (n>1?'s':'') : 'Rien pour l\u2019instant';
+    if(tileRepas) tileRepas.classList.remove('attention');
+  }
+  updateRepasBadge();
+
+  const nbDates = doodleArr().length;
+  document.getElementById('tile-sub-doodle').textContent = nbDates ? nbDates + ' date(s) proposée(s)' : 'Aucune date';
+
+  document.getElementById('tile-sub-bilan').textContent = 'Vue d\u2019ensemble';
+}
+
+function showSection(name){
+  document.getElementById('espace-grid').style.display = 'none';
+  document.getElementById('espace-detail').style.display = 'block';
+  document.getElementById('back-from-espace').style.display = 'none';
   document.querySelectorAll('.section').forEach(s=>s.classList.toggle('active', s.id==='tab-'+name));
   if(name==='liste') renderListe();
   if(name==='repas') renderRepasTab();
   if(name==='doodle') renderDoodle();
   if(name==='moninscription') renderMonInscription();
   if(name==='bilan') renderBilan();
+  window.scrollTo(0,0);
 }
-document.querySelectorAll('.tab-btn').forEach(btn=>{
-  btn.addEventListener('click', ()=> switchTab(btn.dataset.tab));
+function backToGrid(){
+  document.getElementById('espace-detail').style.display = 'none';
+  document.getElementById('espace-grid').style.display = 'block';
+  document.getElementById('back-from-espace').style.display = 'block';
+  renderEspaceGrid();
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('.big-tile').forEach(btn=>{
+  btn.addEventListener('click', ()=> showSection(btn.dataset.section));
 });
+document.getElementById('back-to-grid').addEventListener('click', backToGrid);
 
 /* ---------------- RECAP "MON INSCRIPTION" ---------------- */
 function updateRepasBadge(){
@@ -1158,7 +1253,7 @@ function renderMonInscription(){
       <button class="btn btn-outline" id="btn-modifier-inscription" style="margin-top:16px;">✏️ Modifier ma réponse</button>
     `;
     if(!hasRepas){
-      document.getElementById('btn-go-repas-nudge').addEventListener('click', ()=> switchTab('repas'));
+      document.getElementById('btn-go-repas-nudge').addEventListener('click', ()=> showSection('repas'));
     }
   } else {
     wrap.innerHTML = `
@@ -1903,6 +1998,7 @@ function init(){
 }
 init();
 </script>
+
 
 
 
