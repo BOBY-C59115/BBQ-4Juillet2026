@@ -141,6 +141,19 @@
     transition: all .15s;
     white-space:nowrap;
   }
+  .tab-badge{
+    display:inline-flex; align-items:center; justify-content:center;
+    background:var(--rouge); color:white; font-size:11px; font-weight:800;
+    width:18px; height:18px; border-radius:50%; flex-shrink:0;
+  }
+  .nudge-repas{
+    display:flex; align-items:center; gap:12px; margin-top:18px;
+    background:#FFF3D6; border:2px solid var(--or-logo); border-radius:14px; padding:14px;
+  }
+  .nudge-repas .ic{font-size:26px; flex-shrink:0;}
+  .nudge-repas b{font-size:14px; color:var(--encre); display:block; margin-bottom:2px;}
+  .nudge-repas p{font-size:12.5px; color:var(--encre2); margin:0;}
+  .nudge-repas .btn{flex-shrink:0; padding:10px 12px; font-size:12.5px;}
   .tab-btn.active{
     background: var(--marine);
     border-color: var(--marine);
@@ -650,7 +663,7 @@
     <div class="tabs">
       <button class="tab-btn active" data-tab="moninscription"><span class="emoji">✋</span> Mon inscription</button>
       <button class="tab-btn" data-tab="liste"><span class="emoji">👥</span> Qui vient</button>
-      <button class="tab-btn" data-tab="repas"><span class="emoji">🧺</span> Qui ramène quoi</button>
+      <button class="tab-btn" data-tab="repas"><span class="emoji">🧺</span> Qui ramène quoi<span class="tab-badge" id="repas-badge" style="display:none;">!</span></button>
       <button class="tab-btn" data-tab="doodle"><span class="emoji">📅</span> Pas dispo ?</button>
       <button class="tab-btn" data-tab="bilan"><span class="emoji">📊</span> Bilan</button>
     </div>
@@ -994,6 +1007,7 @@ onValue(ref(db,"bbq2026/repas"), (snap)=>{
   renderRecapTout();
   renderAdminRepas();
   renderBilan();
+  updateRepasBadge();
 });
 onValue(ref(db,"bbq2026/doodle"), (snap)=>{
   state.doodle = snap.val() || {};
@@ -1084,7 +1098,9 @@ function enterEspace(){
   renderRepasTab();
   renderDoodle();
   renderBilan();
-  switchTab('moninscription');
+  const me = state.participants[CU.id];
+  const needsRepas = !!(me && me.participe === 'oui' && !state.repas[CU.id]);
+  switchTab(needsRepas ? 'repas' : 'moninscription');
 }
 
 /* ---------------- TABS (espace) ---------------- */
@@ -1102,9 +1118,17 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
 });
 
 /* ---------------- RECAP "MON INSCRIPTION" ---------------- */
+function updateRepasBadge(){
+  const me = state.participants[CU.id];
+  const needsAction = !!(me && me.participe === 'oui' && !state.repas[CU.id]);
+  const badge = document.getElementById('repas-badge');
+  if(badge) badge.style.display = needsAction ? 'inline-flex' : 'none';
+}
+
 function renderMonInscription(){
   const wrap = document.getElementById('recap-mon-inscription');
   const me = state.participants[CU.id];
+  updateRepasBadge();
   if(!me){
     wrap.innerHTML = `
       <div class="empty">
@@ -1120,12 +1144,22 @@ function renderMonInscription(){
   }
   if(me.participe === 'oui'){
     const invitesHtml = (me.invites||[]).map(i=>`<li><div class="avatar">${initials(i.prenom,i.nom)}</div><span>${escapeHtml(i.prenom)} ${escapeHtml(i.nom)}</span></li>`).join('');
+    const hasRepas = !!state.repas[CU.id];
     wrap.innerHTML = `
       <h2><span class="emoji">🎉</span> Tu viens !</h2>
       <p class="desc">${escapeHtml(me.prenom)} ${escapeHtml(me.nom)} · ${escapeHtml(me.tel)}</p>
       ${me.mode==='accomp' && me.invites && me.invites.length ? `<p class="desc" style="margin-bottom:6px;">Accompagné de ${me.invites.length} personne(s) :</p><ul class="plist">${invitesHtml}</ul>` : `<p class="desc" style="margin-bottom:0;">Tu viens seul(e).</p>`}
+      ${!hasRepas ? `
+      <div class="nudge-repas">
+        <span class="ic">🧺</span>
+        <div><b>Encore une chose !</b><p>Indique ce que tu comptes ramener (boisson, salé ou sucré).</p></div>
+        <button class="btn btn-or" id="btn-go-repas-nudge">C'est par ici</button>
+      </div>` : ''}
       <button class="btn btn-outline" id="btn-modifier-inscription" style="margin-top:16px;">✏️ Modifier ma réponse</button>
     `;
+    if(!hasRepas){
+      document.getElementById('btn-go-repas-nudge').addEventListener('click', ()=> switchTab('repas'));
+    }
   } else {
     wrap.innerHTML = `
       <h2><span class="emoji">😢</span> Tu ne viens pas</h2>
@@ -1869,6 +1903,7 @@ function init(){
 }
 init();
 </script>
+
 
 
 
