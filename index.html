@@ -1084,11 +1084,24 @@ document.getElementById('choice-accomp').addEventListener('click', ()=>{
   renderInvites();
 });
 
+function updateInviteWarning(i){
+  const warnEl = document.getElementById('warn-inv-'+i);
+  if(!warnEl) return;
+  const inv = invites[i];
+  const isDup = inv && checkDoublon(inv.prenom, inv.nom, CU.id);
+  if(isDup && inv.prenom && inv.nom){
+    warnEl.innerHTML = `⚠️ <span>Quelqu'un de ce nom est déjà inscrit. Vérifie qu'il ne s'agit pas d'un doublon.</span>`;
+    warnEl.classList.add('show');
+  } else {
+    warnEl.classList.remove('show');
+  }
+}
 function renderInvites(){
+  // Reconstruction complète de la liste : à utiliser seulement quand on ajoute/retire
+  // une personne, jamais pendant la frappe (sinon le champ perd le focus à chaque lettre).
   const wrap = document.getElementById('invites-list');
   wrap.innerHTML = '';
   invites.forEach((inv, i)=>{
-    const isDup = checkDoublon(inv.prenom, inv.nom, CU.id);
     const box = document.createElement('div');
     box.className = 'accomp-box';
     box.innerHTML = `
@@ -1097,15 +1110,22 @@ function renderInvites(){
       <input type="text" class="inv-prenom" data-i="${i}" placeholder="Prénom" value="${escapeHtml(inv.prenom)}">
       <label>Nom</label>
       <input type="text" class="inv-nom" data-i="${i}" placeholder="Nom" value="${escapeHtml(inv.nom)}">
-      ${isDup && inv.prenom && inv.nom ? `<div class="warnmsg show">⚠️ <span>Quelqu'un de ce nom est déjà inscrit. Vérifie qu'il ne s'agit pas d'un doublon.</span></div>` : ''}
+      <div class="warnmsg" id="warn-inv-${i}"></div>
     `;
     wrap.appendChild(box);
+    updateInviteWarning(i);
   });
   wrap.querySelectorAll('.inv-prenom').forEach(el=>{
-    el.addEventListener('input', e=>{ invites[+e.target.dataset.i].prenom = e.target.value; renderInvites(); });
+    el.addEventListener('input', e=>{
+      invites[+e.target.dataset.i].prenom = e.target.value;
+      updateInviteWarning(+e.target.dataset.i);
+    });
   });
   wrap.querySelectorAll('.inv-nom').forEach(el=>{
-    el.addEventListener('input', e=>{ invites[+e.target.dataset.i].nom = e.target.value; renderInvites(); });
+    el.addEventListener('input', e=>{
+      invites[+e.target.dataset.i].nom = e.target.value;
+      updateInviteWarning(+e.target.dataset.i);
+    });
   });
   wrap.querySelectorAll('.remove-x').forEach(el=>{
     el.addEventListener('click', e=>{
@@ -1565,6 +1585,7 @@ function init(){
 }
 init();
 </script>
+
 
 </body>
 </html>
