@@ -1259,11 +1259,15 @@ function renderRepasTab(){
     return;
   }
   const existing = state.repas[CU.id];
-  if(existing){
-    mesItems = JSON.parse(JSON.stringify(existing.items));
-    mesItems.boisson.forEach(i=>{ if(typeof i.qte !== 'number') i.qte = parseInt(i.qte)||1; });
-    mesItems.sale.forEach(i=>{ if(typeof i.qte !== 'number') i.qte = parseInt(i.qte)||1; });
-    mesItems.sucre.forEach(i=>{ if(typeof i.qte !== 'number') i.qte = parseInt(i.qte)||1; });
+  function normCat(arr){
+    return (arr||[]).map(i=>({ nom: i.nom, qte: typeof i.qte === 'number' ? i.qte : (parseInt(i.qte)||1) }));
+  }
+  if(existing && existing.items){
+    mesItems = {
+      boisson: normCat(existing.items.boisson),
+      sale: normCat(existing.items.sale),
+      sucre: normCat(existing.items.sucre)
+    };
   } else {
     mesItems = { boisson: [], sale: [], sucre: [] };
   }
@@ -1585,6 +1589,7 @@ function init(){
 }
 init();
 </script>
+
 
 
 </body>
