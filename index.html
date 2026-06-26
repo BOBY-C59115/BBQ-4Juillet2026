@@ -1871,7 +1871,7 @@ async function buildAndDownloadExcel(){
   }catch(e){ /* logo facultatif, on n'interrompt pas l'export s'il manque */ }
 
   // 4 cartes chiffres clés
-  xKpiCard(dash, 7, 2, '🎉', presents.length, 'personnes présentes', XC.saugeLight, XC.saugeDark);
+  xKpiCard(dash, 7, 2, '🎉', totalPersonnes, 'personnes présentes', XC.saugeLight, XC.saugeDark);
   xKpiCard(dash, 7, 4, '😢', absents.length, 'ne viennent pas', XC.rougeLight, XC.rouge);
   xKpiCard(dash, 7, 6, '✋', all.length, 'foyers inscrits', XC.blueLight, XC.marine);
   xKpiCard(dash, 7, 8, '🧺', nbLignesVictuailles, 'plats/boissons annoncés', XC.orLight, XC.orDark);
@@ -1894,7 +1894,7 @@ async function buildAndDownloadExcel(){
 
   // Petits tableaux de données (alimentent les graphiques, restent des cellules normales)
   xHeaderRow(dash, 1, 12, ['Statut','Nombre']);
-  dash.getCell(2,12).value='Viennent'; dash.getCell(2,13).value=presents.length;
+  dash.getCell(2,12).value='Viennent'; dash.getCell(2,13).value=totalPersonnes;
   dash.getCell(3,12).value='Absents'; dash.getCell(3,13).value=absents.length;
 
   xHeaderRow(dash, 5, 12, ['Catégorie','Quantité']);
@@ -1908,7 +1908,7 @@ async function buildAndDownloadExcel(){
   }
 
   // Graphiques (canvas -> PNG -> image insérée), placés sous les cartes
-  const pieId = wb.addImage({ base64: chartPie(presents.length, absents.length), extension:'png' });
+  const pieId = wb.addImage({ base64: chartPie(totalPersonnes, absents.length), extension:'png' });
   dash.addImage(pieId, { tl:{col:1,row:nextRow-1}, ext:{width:330,height:225} });
   const barId = wb.addImage({ base64: chartBarCategories(counts), extension:'png' });
   dash.addImage(barId, { tl:{col:5,row:nextRow-1}, ext:{width:330,height:225} });
@@ -2180,6 +2180,7 @@ function init(){
 }
 init();
 </script>
+
 
 
 
