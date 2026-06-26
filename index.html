@@ -259,41 +259,6 @@
   .btn-fluo{background:var(--fluo); color:var(--marine);}
   .btn-sauge{background:var(--sauge); color:white;}
   .btn-or{background:var(--or-logo); color:#3A2400;}
-  .btnrow-export{display:flex; gap:10px;}
-  .btnrow-export .btn{flex:1; font-size:13.5px; padding:12px 8px;}
-
-  /* ---------- RAPPORT IMPRIMABLE (export PDF via impression navigateur) ---------- */
-  #print-rapport{display:none;}
-  @media print{
-    body *{visibility:hidden;}
-    #print-rapport, #print-rapport *{visibility:visible;}
-    #print-rapport{
-      display:block; position:absolute; top:0; left:0; width:100%; padding:24px;
-      -webkit-print-color-adjust:exact; print-color-adjust:exact;
-      color:var(--encre); font-family:'Quicksand',sans-serif;
-    }
-    .pr-header{text-align:center; margin-bottom:22px; border-bottom:3px solid var(--fluo-dim); padding-bottom:16px;}
-    .pr-title{font-size:26px; font-weight:800; color:var(--marine);}
-    .pr-sub{font-size:12px; color:var(--encre2); margin-top:4px;}
-    .pr-section{margin-bottom:24px; page-break-inside:avoid;}
-    .pr-section h2{font-size:17px; color:var(--marine); border-bottom:2px solid var(--creme2); padding-bottom:6px; margin-bottom:12px;}
-    .pr-stats{display:flex; gap:14px; margin-bottom:12px;}
-    .pr-stat{flex:1; text-align:center; background:var(--creme2); border-radius:10px; padding:10px;}
-    .pr-n{font-size:22px; font-weight:800; color:var(--marine);}
-    .pr-l{font-size:10.5px; color:var(--encre2);}
-    .pr-bar{height:14px; background:var(--rouge-light); border-radius:8px; overflow:hidden;}
-    .pr-bar-fill{height:100%; background:var(--sauge);}
-    .pr-cols{display:flex; gap:20px;}
-    .pr-cols > div{flex:1;}
-    .pr-cols h3{font-size:13px; margin-bottom:6px; color:var(--marine);}
-    .pr-cols ul{padding-left:18px; font-size:12.5px; line-height:1.6; margin:0;}
-    .pr-empty{color:var(--encre2); font-style:italic; list-style:none; margin-left:-18px;}
-    .pr-table{width:100%; border-collapse:collapse; font-size:12px;}
-    .pr-table th{text-align:left; background:var(--marine); color:white; padding:6px 8px;}
-    .pr-table td{padding:5px 8px; border-bottom:1px solid var(--creme2);}
-    .pr-doodle-row{font-size:13px; padding:6px 0; border-bottom:1px solid var(--creme2);}
-    .pr-footer{text-align:center; font-size:11px; color:var(--encre2); margin-top:26px;}
-  }
   .btn-ghost{background:var(--creme2); color:var(--encre);}
   .btn-outline{background:white; color:var(--encre); border:2px solid var(--creme2);}
   .btn-rouge{background:var(--rouge-light); color:var(--rouge);}
@@ -542,7 +507,7 @@
     .welcome-hero{margin:0 -16px 22px;}
   }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 </head>
 <body>
 
@@ -823,6 +788,8 @@
 
     <!-- TAB: bilan (stats simples) -->
     <div class="section" id="tab-bilan">
+      <button class="btn btn-or" id="btn-export-excel" style="width:100%; margin-bottom:16px;">📊 Télécharger le bilan en Excel</button>
+
       <div class="card">
         <h2><span class="emoji">👥</span> Qui vient au BBQ</h2>
         <div class="stat-row">
@@ -850,23 +817,12 @@
 </div>
 
 <!-- ========== TOAST ========== -->
-<div id="print-rapport"></div>
-
 <div class="toast" id="toast" style="display:none;"></div>
 
 <!-- ========== MODAL ADMIN PANEL ========== -->
 <div class="overlay hidden" id="overlay-admin-panel">
   <div class="sheet">
     <h3>⚙️ Espace organisateur</h3>
-
-    <div style="background:var(--creme2); border-radius:14px; padding:14px; margin-bottom:20px;">
-      <h3 style="font-size:15px; margin-bottom:4px;">📤 Partager le bilan</h3>
-      <p class="desc" style="margin-bottom:12px;">Pratique pour envoyer un point d'étape au groupe, ou garder une liste de course imprimable.</p>
-      <div class="btnrow-export">
-        <button class="btn btn-marine" id="btn-export-pdf">📄 Export PDF</button>
-        <button class="btn btn-or" id="btn-export-excel">📊 Export Excel</button>
-      </div>
-    </div>
 
     <label class="first">📍 Lieu du BBQ</label>
     <input type="text" id="admin-lieu" placeholder="Adresse ou lieu">
@@ -1734,115 +1690,341 @@ function renderBilan(){
   }
 }
 
-/* ---------------- EXPORT : PDF (impression navigateur) + EXCEL (.xlsx) ---------------- */
-function exportRows_Participants(){
-  return partArr().map(p=>({
-    'Prénom': p.prenom,
-    'Nom': p.nom,
-    'Téléphone': p.tel,
-    'Participe': p.participe === 'oui' ? 'Oui' : 'Non',
-    'Invités': (p.invites||[]).map(i=>i.prenom+' '+i.nom).join(', '),
-    'Total personnes': p.participe === 'oui' ? 1+(p.invites?p.invites.length:0) : 0
-  }));
+/* ---------------- EXPORT EXCEL STYLISÉ (.xlsx via ExcelJS) ---------------- */
+const XC = {
+  marine:'FF0B1F3A', fluo:'FFF4FF1A', fluoDim:'FFD9E600', white:'FFFFFFFF', gris:'FF5C6470',
+  saugeLight:'FFE3F6EC', saugeDark:'FF1E7A4C',
+  rougeLight:'FFFDEDEB', rouge:'FFE74C3C',
+  orLight:'FFFFF3D6', orDark:'FF8A5A00',
+  blueLight:'FFDCE4F0',
+  lavLight:'FFE4ECFA', lavDark:'FF1A4A8C',
+  neutralLight:'FFEEEFE6'
+};
+function toTitleCase(s){
+  if(!s) return s;
+  return s.toLowerCase().replace(/(^|[\s'-])(\p{L})/gu, (m,sep,ch)=> sep+ch.toUpperCase());
 }
-function exportRows_Victuailles(){
-  const rows = [];
-  const labels = { boisson:'Boisson', sale:'Salé', sucre:'Sucré' };
-  repasArr().forEach(r=>{
-    ['boisson','sale','sucre'].forEach(c=>{
-      (r.items[c]||[]).forEach(it=>{
-        rows.push({ 'Catégorie': labels[c], 'Article': it.nom, 'Quantité': it.qte||1, 'Apporté par': r.nomComplet });
-      });
-    });
+function xFill(ws, r1,c1,r2,c2, argb){
+  for(let r=r1;r<=r2;r++) for(let c=c1;c<=c2;c++){ ws.getCell(r,c).fill = { type:'pattern', pattern:'solid', fgColor:{argb} }; }
+}
+function xBand(ws, lastCol, lines){
+  lines.forEach((line,i)=>{
+    const r=i+1;
+    xFill(ws,r,1,r,lastCol,XC.marine);
+    ws.mergeCells(r,1,r,lastCol-1);
+    const cell = ws.getCell(r,1);
+    cell.value = line.text;
+    cell.font = line.font;
+    cell.alignment = {horizontal:'left', vertical:'middle', indent:1};
+    ws.getRow(r).height = i===0 ? 24 : 18;
   });
-  return rows;
+  return lines.length;
 }
-function exportRows_Doodle(){
-  return doodleArr().sort((a,b)=>Object.keys(b.votes).length-Object.keys(a.votes).length)
-    .map(o=>({ 'Date proposée': o.date, 'Moment': o.moment==='midi' ? 'Midi' : 'Soir', 'Nombre de votes': Object.keys(o.votes).length }));
+function xKpiCard(ws, r, c, icon, value, label, fillArgb, textArgb){
+  ws.mergeCells(r,c,r,c+1);
+  const ic = ws.getCell(r,c); ic.value=icon; ic.font={size:18}; ic.alignment={horizontal:'center',vertical:'middle'};
+  xFill(ws,r,c,r,c+1,fillArgb);
+  ws.mergeCells(r+1,c,r+2,c+1);
+  const nc = ws.getCell(r+1,c); nc.value=value; nc.font={bold:true,size:24,color:{argb:textArgb}}; nc.alignment={horizontal:'center',vertical:'middle'};
+  xFill(ws,r+1,c,r+2,c+1,fillArgb);
+  ws.mergeCells(r+3,c,r+3,c+1);
+  const lc = ws.getCell(r+3,c); lc.value=label; lc.font={bold:true,size:9,color:{argb:XC.gris}}; lc.alignment={horizontal:'center',vertical:'middle',wrapText:true};
+  xFill(ws,r+3,c,r+3,c+1,fillArgb);
+  ws.getRow(r+1).height = 26; ws.getRow(r+3).height = 24;
+}
+function xHeaderRow(ws, r, c1, headers){
+  headers.forEach((h,i)=>{
+    const cell = ws.getCell(r,c1+i);
+    cell.value = h; cell.font = {bold:true, color:{argb:XC.fluo}}; cell.fill = {type:'pattern',pattern:'solid',fgColor:{argb:XC.marine}};
+    cell.alignment = {horizontal:'left', vertical:'middle'};
+  });
+  ws.getRow(r).height = 20;
 }
 
-document.getElementById('btn-export-excel').addEventListener('click', ()=>{
-  if(!window.XLSX){ showToast("Le module Excel n'a pas pu se charger (vérifie ta connexion)", "⚠️"); return; }
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exportRows_Participants()), "Participants");
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exportRows_Victuailles()), "Victuailles");
-  const doodleRows = exportRows_Doodle();
-  if(doodleRows.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(doodleRows), "Dates de repli");
-  XLSX.writeFile(wb, "Bilan_BBQ_4_juillet_2026.xlsx");
-  showToast("Fichier Excel téléchargé !", "📊");
-});
+/* ---- Graphiques en <canvas>, exportés en PNG (pas de librairie de graphes) ---- */
+function chartPie(presents, absents){
+  const c=document.createElement('canvas'); c.width=380; c.height=260;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle='#FFFFFF'; ctx.fillRect(0,0,c.width,c.height);
+  ctx.font='bold 15px Arial'; ctx.fillStyle='#0B1F3A'; ctx.textAlign='center';
+  ctx.fillText('🎉 Présents vs 😢 Absents', c.width/2, 24);
+  const total = presents+absents;
+  const cx=c.width/2, cy=130, r=85;
+  if(total===0){
+    ctx.font='13px Arial'; ctx.fillStyle='#5C6470';
+    ctx.fillText('Aucune réponse pour le moment', cx, cy);
+  } else {
+    const segs=[{label:'Présents',value:presents,color:'#3BB273'},{label:'Absents',value:absents,color:'#E74C3C'}].filter(s=>s.value>0);
+    let start=-Math.PI/2;
+    segs.forEach(seg=>{
+      const slice = seg.value/total*Math.PI*2;
+      ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,r,start,start+slice); ctx.closePath();
+      ctx.fillStyle=seg.color; ctx.fill();
+      start+=slice;
+    });
+    let lx=40;
+    segs.forEach(seg=>{
+      const pct=Math.round(seg.value/total*100);
+      ctx.fillStyle=seg.color; ctx.fillRect(lx,232,14,14);
+      ctx.fillStyle='#0B1F3A'; ctx.font='13px Arial'; ctx.textAlign='left';
+      ctx.fillText(seg.label+' : '+seg.value+' ('+pct+'%)', lx+20, 243);
+      lx += ctx.measureText(seg.label+' : '+seg.value+' ('+pct+'%)').width + 50;
+    });
+  }
+  return c.toDataURL('image/png').split(',')[1];
+}
+function chartBarCategories(counts){
+  const c=document.createElement('canvas'); c.width=380; c.height=260;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle='#FFFFFF'; ctx.fillRect(0,0,c.width,c.height);
+  ctx.font='bold 15px Arial'; ctx.fillStyle='#0B1F3A'; ctx.textAlign='center';
+  ctx.fillText('🧺 Quantités par catégorie', c.width/2, 24);
+  const cats=[['🥤 Boisson',counts.boisson,'#1A4A8C'],['🧀 Salé',counts.sale,'#1E7A4C'],['🍰 Sucré',counts.sucre,'#B8860B']];
+  const max=Math.max(counts.boisson,counts.sale,counts.sucre,1);
+  const baseY=210, top=55, chartH=baseY-top, barW=70, gap=35, startX=42;
+  ctx.strokeStyle='#EEEFE6'; ctx.beginPath(); ctx.moveTo(28,baseY); ctx.lineTo(352,baseY); ctx.stroke();
+  cats.forEach((cat,i)=>{
+    const x=startX+i*(barW+gap);
+    const h = cat[1]/max*chartH;
+    ctx.fillStyle=cat[2]; ctx.fillRect(x, baseY-h, barW, Math.max(h,2));
+    ctx.fillStyle='#0B1F3A'; ctx.font='bold 14px Arial'; ctx.textAlign='center';
+    ctx.fillText(String(cat[1]), x+barW/2, baseY-h-8);
+    ctx.font='12px Arial'; ctx.fillStyle='#5C6470';
+    ctx.fillText(cat[0], x+barW/2, baseY+20);
+  });
+  return c.toDataURL('image/png').split(',')[1];
+}
+function chartDoodle(sorted){
+  const rowH=32, top=46;
+  const w=700, h=top+Math.max(1,sorted.length)*rowH+20;
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle='#FFFFFF'; ctx.fillRect(0,0,w,h);
+  ctx.font='bold 15px Arial'; ctx.fillStyle='#0B1F3A'; ctx.textAlign='center';
+  ctx.fillText('📅 Dates de repli — votes reçus', w/2, 24);
+  if(!sorted.length){
+    ctx.font='13px Arial'; ctx.fillStyle='#5C6470';
+    ctx.fillText('Aucune date proposée', w/2, 60);
+    return c.toDataURL('image/png').split(',')[1];
+  }
+  const max = Math.max(...sorted.map(o=>o.n), 1);
+  const labelW=260, barAreaW=w-labelW-90, barX=labelW;
+  sorted.forEach((o,i)=>{
+    const y = top + i*rowH;
+    ctx.font = i===0 ? 'bold 13px Arial' : '13px Arial';
+    ctx.fillStyle='#0B1F3A'; ctx.textAlign='right';
+    let label=(i===0?'⭐ ':'')+o.label;
+    if(label.length>33) label=label.slice(0,31)+'…';
+    ctx.fillText(label, labelW-10, y+rowH/2+4);
+    const bw=Math.max(4, o.n/max*barAreaW);
+    ctx.fillStyle = i===0 ? '#F7B902' : '#0B1F3A';
+    ctx.fillRect(barX, y+6, bw, rowH-14);
+    ctx.fillStyle='#0B1F3A'; ctx.font='bold 12px Arial'; ctx.textAlign='left';
+    ctx.fillText(String(o.n), barX+bw+8, y+rowH/2+4);
+  });
+  return c.toDataURL('image/png').split(',')[1];
+}
 
-function renderPrintRapport(){
+async function buildAndDownloadExcel(){
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Lys Cyclo';
+  wb.created = new Date();
+
   const all = partArr();
   const presents = all.filter(p=>p.participe==='oui');
   const absents = all.filter(p=>p.participe==='non');
-  let total = 0; presents.forEach(p=>{ total += 1+(p.invites?p.invites.length:0); });
-  const totalReponses = presents.length+absents.length;
-  const pctOui = totalReponses ? Math.round(presents.length/totalReponses*100) : 0;
+  let totalPersonnes=0; presents.forEach(p=>{ totalPersonnes += 1+(p.invites?p.invites.length:0); });
 
   const allRepas = repasArr();
-  const counts = { boisson:0, sale:0, sucre:0 };
-  allRepas.forEach(r=>['boisson','sale','sucre'].forEach(c=>(r.items[c]||[]).forEach(it=>counts[c]+=(it.qte||1))));
+  const counts={boisson:0,sale:0,sucre:0};
+  const labels={boisson:'🥤 Boisson',sale:'🧀 Salé',sucre:'🍰 Sucré'};
+  let nbLignesVictuailles=0;
+  allRepas.forEach(r=>['boisson','sale','sucre'].forEach(c=>(r.items[c]||[]).forEach(it=>{ counts[c]+=(it.qte||1); nbLignesVictuailles++; })));
 
-  function catLines(c){
-    const lines = [];
-    allRepas.forEach(r=>(r.items[c]||[]).forEach(it=>lines.push(`${escapeHtml(it.nom)}${it.qte>1?' ×'+it.qte:''} — <i>${escapeHtml(r.nomComplet)}</i>`)));
-    return lines;
+  const doodleSorted = doodleArr()
+    .map(o=>({ label: o.date+' ('+(o.moment==='midi'?'midi':'soir')+')', n: Object.keys(o.votes).length, moment:o.moment }))
+    .sort((a,b)=>b.n-a.n);
+  const hasDoodle = doodleSorted.length>0;
+  const topDoodle = hasDoodle && doodleSorted[0].n>0 ? doodleSorted[0] : null;
+
+  const now = new Date();
+  const genDate = now.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) + ' à ' + now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  const eventLine = (state.event.date||'').charAt(0).toUpperCase()+(state.event.date||'').slice(1) + ', dès ' + (state.event.heure||'') + '  ·  ' + (state.event.lieu||'');
+
+  /* ===== SHEET 1 : TABLEAU DE BORD ===== */
+  const dash = wb.addWorksheet('Tableau de bord', { views:[{showGridLines:false}], pageSetup:{fitToPage:true, fitToWidth:1, fitToHeight:0, orientation:'landscape'} });
+  [3,15,13,13,13,13,13,13,13,3,3,28,10].forEach((w,i)=>{ dash.getColumn(i+1).width = w; });
+
+  xBand(dash, 10, [
+    {text:'🔥 BBQ Lys Cyclo — Bilan des inscriptions', font:{bold:true,size:16,color:{argb:XC.fluo}}},
+    {text:eventLine, font:{bold:true,size:11,color:{argb:XC.white}}},
+    {text:'📸 Photo de l\u2019instant T — bilan généré le '+genDate+' à partir de l\u2019appli d\u2019inscription en ligne', font:{size:9.5,color:{argb:XC.fluoDim}}}
+  ]);
+  dash.getRow(5).height = 6;
+
+  // Logo (récupéré depuis l'image déjà présente dans la page)
+  try{
+    const logoSrc = document.querySelector('#screen-welcome .logo-wrap img').src;
+    const logoB64 = logoSrc.split(',')[1];
+    const logoId = wb.addImage({ base64: logoB64, extension:'png' });
+    dash.addImage(logoId, { tl:{col:8.3, row:0.15}, ext:{width:58,height:58} });
+  }catch(e){ /* logo facultatif, on n'interrompt pas l'export s'il manque */ }
+
+  // 4 cartes chiffres clés
+  xKpiCard(dash, 7, 2, '🎉', presents.length, 'personnes présentes', XC.saugeLight, XC.saugeDark);
+  xKpiCard(dash, 7, 4, '😢', absents.length, 'ne viennent pas', XC.rougeLight, XC.rouge);
+  xKpiCard(dash, 7, 6, '✋', all.length, 'foyers inscrits', XC.blueLight, XC.marine);
+  xKpiCard(dash, 7, 8, '🧺', nbLignesVictuailles, 'plats/boissons annoncés', XC.orLight, XC.orDark);
+  dash.getRow(11).height = 7;
+
+  // Bandeau date de repli la plus demandée
+  let nextRow = 12;
+  if(topDoodle){
+    dash.mergeCells(12,2,12,9);
+    xFill(dash,12,2,12,9,XC.orLight);
+    const c = dash.getCell(12,2);
+    c.value = '⭐ Date de repli la plus demandée : '+topDoodle.label+' ('+topDoodle.n+' vote'+(topDoodle.n>1?'s':'')+')';
+    c.font = {bold:true, size:11, color:{argb:XC.orDark}};
+    c.alignment = {horizontal:'center', vertical:'middle'};
+    dash.getRow(12).height = 22;
+    nextRow = 14;
+  } else {
+    nextRow = 13;
   }
 
-  const sortedDoodle = doodleArr().sort((a,b)=>Object.keys(b.votes).length-Object.keys(a.votes).length).filter(o=>Object.keys(o.votes).length>0);
-  const dateGen = new Date().toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long', year:'numeric' }) +
-    ' à ' + new Date().toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
+  // Petits tableaux de données (alimentent les graphiques, restent des cellules normales)
+  xHeaderRow(dash, 1, 12, ['Statut','Nombre']);
+  dash.getCell(2,12).value='Viennent'; dash.getCell(2,13).value=presents.length;
+  dash.getCell(3,12).value='Absents'; dash.getCell(3,13).value=absents.length;
 
-  document.getElementById('print-rapport').innerHTML = `
-    <div class="pr-header">
-      <div class="pr-title">🔥 Bilan BBQ du 4 juillet 2026</div>
-      <div class="pr-sub">Lys Cyclo — généré le ${dateGen}</div>
-    </div>
+  xHeaderRow(dash, 5, 12, ['Catégorie','Quantité']);
+  dash.getCell(6,12).value=labels.boisson; dash.getCell(6,13).value=counts.boisson;
+  dash.getCell(7,12).value=labels.sale; dash.getCell(7,13).value=counts.sale;
+  dash.getCell(8,12).value=labels.sucre; dash.getCell(8,13).value=counts.sucre;
 
-    <div class="pr-section">
-      <h2>👥 Qui vient</h2>
-      <div class="pr-stats">
-        <div class="pr-stat"><div class="pr-n">${total}</div><div class="pr-l">personnes attendues</div></div>
-        <div class="pr-stat"><div class="pr-n">${presents.length}</div><div class="pr-l">ont dit oui</div></div>
-        <div class="pr-stat"><div class="pr-n">${absents.length}</div><div class="pr-l">ne viennent pas</div></div>
-      </div>
-      ${totalReponses ? `<div class="pr-bar"><div class="pr-bar-fill" style="width:${pctOui}%;"></div></div>` : ''}
-    </div>
+  if(hasDoodle){
+    xHeaderRow(dash, 10, 12, ['Date','Votes']);
+    doodleSorted.forEach((o,i)=>{ dash.getCell(11+i,12).value=(i===0&&o.n>0?'⭐ ':'')+o.label; dash.getCell(11+i,13).value=o.n; });
+  }
 
-    <div class="pr-section">
-      <h2>🧺 Qui ramène quoi</h2>
-      <div class="pr-cols">
-        <div><h3>🥤 Boissons (${counts.boisson})</h3><ul>${catLines('boisson').map(l=>`<li>${l}</li>`).join('') || '<li class="pr-empty">Rien renseigné</li>'}</ul></div>
-        <div><h3>🧀 Salé (${counts.sale})</h3><ul>${catLines('sale').map(l=>`<li>${l}</li>`).join('') || '<li class="pr-empty">Rien renseigné</li>'}</ul></div>
-        <div><h3>🍰 Sucré (${counts.sucre})</h3><ul>${catLines('sucre').map(l=>`<li>${l}</li>`).join('') || '<li class="pr-empty">Rien renseigné</li>'}</ul></div>
-      </div>
-    </div>
+  // Graphiques (canvas -> PNG -> image insérée), placés sous les cartes
+  const pieId = wb.addImage({ base64: chartPie(presents.length, absents.length), extension:'png' });
+  dash.addImage(pieId, { tl:{col:1,row:nextRow-1}, ext:{width:330,height:225} });
+  const barId = wb.addImage({ base64: chartBarCategories(counts), extension:'png' });
+  dash.addImage(barId, { tl:{col:5,row:nextRow-1}, ext:{width:330,height:225} });
+  let afterCharts = nextRow + 13;
 
-    <div class="pr-section">
-      <h2>📋 Liste détaillée des participants</h2>
-      <table class="pr-table">
-        <thead><tr><th>Nom</th><th>Téléphone</th><th>Vient ?</th><th>Invités</th></tr></thead>
-        <tbody>
-          ${all.map(p=>`<tr><td>${escapeHtml(p.prenom)} ${escapeHtml(p.nom)}</td><td>${escapeHtml(p.tel)}</td><td>${p.participe==='oui'?'🎉 Oui':'😢 Non'}</td><td>${(p.invites||[]).map(i=>escapeHtml(i.prenom+' '+i.nom)).join(', ')||'—'}</td></tr>`).join('') || '<tr><td colspan="4" class="pr-empty">Aucune inscription</td></tr>'}
-        </tbody>
-      </table>
-    </div>
+  if(hasDoodle){
+    const doodleImgId = wb.addImage({ base64: chartDoodle(doodleSorted), extension:'png' });
+    dash.addImage(doodleImgId, { tl:{col:1,row:afterCharts-1}, ext:{width:610,height: 46+doodleSorted.length*32+20} });
+    afterCharts += Math.ceil((46+doodleSorted.length*32+20)/20) + 2;
+  }
 
-    ${sortedDoodle.length ? `
-    <div class="pr-section">
-      <h2>📅 Dates de repli proposées</h2>
-      ${sortedDoodle.map((o,i)=>`<div class="pr-doodle-row">${i===0?'⭐ ':''}${o.moment==='midi'?'☀️':'🌙'} ${escapeHtml(o.date)} — <b>${Object.keys(o.votes).length} dispo(s)</b></div>`).join('')}
-    </div>` : ''}
+  dash.mergeCells(afterCharts,2,afterCharts,9);
+  const foot = dash.getCell(afterCharts,2);
+  foot.value = '💻 Inscriptions et auberge espagnole mises à jour en direct sur l\u2019appli BBQ Lys Cyclo — partage le lien pour les retardataires !';
+  foot.font = {italic:true, size:9.5, color:{argb:XC.gris}};
+  foot.alignment = {horizontal:'center'};
 
-    <div class="pr-footer">🚴 Lys Cyclo — L'amitié en roue libre</div>
-  `;
+  /* ===== SHEET 2 : PARTICIPANTS ===== */
+  const wsP = wb.addWorksheet('Participants', { views:[{showGridLines:false}], pageSetup:{fitToPage:true, fitToWidth:1, fitToHeight:0} });
+  [3,24,16,30,16,3].forEach((w,i)=>wsP.getColumn(i+1).width=w);
+  xBand(wsP, 6, [
+    {text:'✋ Participants au BBQ', font:{bold:true,size:14,color:{argb:XC.fluo}}},
+    {text: all.length+' foyer(s) inscrit(s) — '+totalPersonnes+' personne(s) au total — mis à jour le '+now.toLocaleDateString('fr-FR'), font:{size:10,color:{argb:XC.white}}}
+  ]);
+  wsP.getRow(3).height = 6;
+  xHeaderRow(wsP, 4, 2, ['Nom complet','Statut','Invités','Total personnes']);
+  let r = 5;
+  all.forEach(p=>{
+    const present = p.participe==='oui';
+    const bg = present ? XC.saugeLight : XC.rougeLight;
+    const invitesTxt = present && p.invites && p.invites.length ? p.invites.map(i=>toTitleCase(i.prenom)+' '+toTitleCase(i.nom)).join(', ') : '—';
+    const totalP = present ? 1+(p.invites?p.invites.length:0) : 0;
+    wsP.getCell(r,2).value = toTitleCase(p.prenom)+' '+toTitleCase(p.nom);
+    wsP.getCell(r,3).value = present ? '🎉 Vient' : '😢 Ne vient pas';
+    wsP.getCell(r,4).value = invitesTxt;
+    wsP.getCell(r,5).value = totalP;
+    xFill(wsP, r,2,r,5, bg);
+    r++;
+  });
+  wsP.mergeCells(r,2,r,4);
+  wsP.getCell(r,2).value='TOTAL'; wsP.getCell(r,2).font={bold:true,color:{argb:XC.fluo}};
+  wsP.getCell(r,5).value=totalPersonnes; wsP.getCell(r,5).font={bold:true,color:{argb:XC.fluo}};
+  xFill(wsP, r,2,r,5, XC.marine);
+
+  /* ===== SHEET 3 : AUBERGE ESPAGNOLE ===== */
+  const wsR = wb.addWorksheet('Auberge espagnole', { views:[{showGridLines:false}], pageSetup:{fitToPage:true, fitToWidth:1, fitToHeight:0} });
+  [3,18,30,12,26,3].forEach((w,i)=>wsR.getColumn(i+1).width=w);
+  xBand(wsR, 6, [
+    {text:'🧺 Qui ramène quoi', font:{bold:true,size:14,color:{argb:XC.fluo}}},
+    {text: nbLignesVictuailles+' ligne(s) annoncée(s) — répartition par catégorie', font:{size:10,color:{argb:XC.white}}}
+  ]);
+  wsR.getRow(3).height = 6;
+  xHeaderRow(wsR, 4, 2, ['Catégorie','Désignation','Quantité','Apporté par']);
+  r = 5;
+  const catBg = { boisson:XC.lavLight, sale:XC.saugeLight, sucre:XC.orLight };
+  ['boisson','sale','sucre'].forEach(cat=>{
+    allRepas.forEach(rp=>{
+      (rp.items[cat]||[]).forEach(it=>{
+        wsR.getCell(r,2).value = labels[cat];
+        wsR.getCell(r,3).value = toTitleCase(it.nom);
+        wsR.getCell(r,4).value = it.qte||1;
+        wsR.getCell(r,5).value = toTitleCase(rp.nomComplet);
+        xFill(wsR, r,2,r,5, catBg[cat]);
+        r++;
+      });
+    });
+  });
+  if(r===5){
+    wsR.mergeCells(5,2,5,5);
+    wsR.getCell(5,2).value='Rien renseigné pour le moment';
+    wsR.getCell(5,2).font={italic:true,color:{argb:XC.gris}};
+    xFill(wsR,5,2,5,5,XC.neutralLight);
+  }
+
+  /* ===== SHEET 4 : DATES DE REPLI ===== */
+  if(hasDoodle){
+    const wsD = wb.addWorksheet('Dates de repli', { views:[{showGridLines:false}], pageSetup:{fitToPage:true, fitToWidth:1, fitToHeight:0} });
+    [3,34,14,12,3].forEach((w,i)=>wsD.getColumn(i+1).width=w);
+    xBand(wsD, 5, [
+      {text:'📅 Dates de repli proposées', font:{bold:true,size:14,color:{argb:XC.fluo}}},
+      {text:'Votes reçus pour une date alternative, triés par popularité', font:{size:10,color:{argb:XC.white}}}
+    ]);
+    wsD.getRow(3).height = 6;
+    xHeaderRow(wsD, 4, 2, ['Date proposée','Moment','Votes']);
+    doodleSorted.forEach((o,i)=>{
+      const rr = 5+i;
+      const isTop = i===0 && o.n>0;
+      wsD.getCell(rr,2).value = (isTop?'⭐ ':'') + o.label.replace(/ \((midi|soir)\)$/,'');
+      wsD.getCell(rr,3).value = o.moment==='midi' ? '☀️ Midi' : '🌙 Soir';
+      wsD.getCell(rr,4).value = o.n;
+      xFill(wsD, rr,2,rr,4, isTop ? XC.orLight : XC.neutralLight);
+    });
+  }
+
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type:'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'Bilan_BBQ_4_juillet_2026.xlsx';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 4000);
 }
 
-document.getElementById('btn-export-pdf').addEventListener('click', ()=>{
-  renderPrintRapport();
-  setTimeout(()=>window.print(), 50);
+document.getElementById('btn-export-excel').addEventListener('click', async ()=>{
+  if(!window.ExcelJS){ showToast("Le module Excel n'a pas pu se charger (vérifie ta connexion)", "⚠️"); return; }
+  showToast('Préparation du fichier…', '⏳');
+  try{
+    await buildAndDownloadExcel();
+    showToast('Fichier Excel téléchargé !', '📊');
+  }catch(err){
+    console.error(err);
+    showToast("Erreur lors de la génération du fichier", "⚠️");
+  }
 });
 
 /* ---------------- ADMIN (réservé admin / superviseur, sans mot de passe séparé) ---------------- */
@@ -1998,6 +2180,7 @@ function init(){
 }
 init();
 </script>
+
 
 
 
